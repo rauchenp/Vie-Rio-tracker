@@ -32,16 +32,17 @@ def get_cheapest():
 
     result = get_flights(query)
 
-    if not result or not result.flights:
+    if not result:
         print("Keine Flüge gefunden")
         return None
 
-    cheapest = min(result.flights, key=lambda f: f.price if f.price else 99999)
+    # result ist jetzt direkt eine Liste
+    cheapest = min(result, key=lambda f: f.price if getattr(f, "price", None) else 99999)
 
     return {
         "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
-        "price": cheapest.price,
-        "airline": getattr(cheapest, "name", "") or getattr(cheapest, "airlines", ""),
+        "price": getattr(cheapest, "price", ""),
+        "airline": str(getattr(cheapest, "airlines", "")),
         "stops": getattr(cheapest, "stops", ""),
         "duration": getattr(cheapest, "duration", ""),
         "details": str(cheapest)[:200],
