@@ -1,0 +1,2 @@
+timestamp,price,airline,stops,duration,details
+2026-08-02 17:23:53,1249,['Iberia'],,,"Flights(type='IB', price=1249, airlines=['Iberia'], flights=[SingleFlight(from_airport=Airport(name='Flughafen Wien Schwechat', code='VIE'), to_airport=Airport(name='Flughafen Madrid-Barajas', code='M"
