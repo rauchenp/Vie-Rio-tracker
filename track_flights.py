@@ -32,7 +32,6 @@ def search_price(adults: int, return_date: str, cabin: str, label: str):
                     from_airport=ORIGIN,
                     to_airport=DESTINATION,
                     max_stops=1,
-                    earliest_departure_hour=19,   # ab 19:00 Uhr
                 ),
                 FlightQuery(
                     date=return_date,
@@ -106,4 +105,3 @@ if __name__ == "__main__":
                 save_price(data)
 
     print("=== Fertig ===")
-    
