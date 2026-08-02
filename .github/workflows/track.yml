@@ -1,0 +1,35 @@
+name: Track Flight Prices
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run tracker
+        run: python track_flights.py
+
+      - name: Commit price history
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add prices.csv
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update prices $(date -u +%Y-%m-%dT%H:%M:%SZ)" && git push)
