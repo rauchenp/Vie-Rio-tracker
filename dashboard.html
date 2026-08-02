@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vie → Rio Flugpreis-Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #e2e8f0;
+      --accent: #38bdf8;
+      --green: #4ade80;
+      --orange: #fb923c;
+      --purple: #c084fc;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; margin-bottom: 24px; font-size: 0.95rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    @media (min-width: 800px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      color: var(--accent);
+    }
+    canvas { width: 100% !important; max-height: 320px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 10px 8px;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+    }
+    th { color: #94a3b8; font-weight: 600; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .eco { background: #166534; color: #bbf7d0; }
+    .prem { background: #9a3412; color: #fed7aa; }
+    .biz { background: #6b21a8; color: #e9d5ff; }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+    }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 3px; }
+    footer {
+      text-align: center;
+      margin-top: 32px;
+      color: #64748b;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="grid">
+    <div style="grid-column: 1 / -1;">
+      <h1>✈️ Wien → Rio de Janeiro</h1>
+      <p class="subtitle">
+        Hinflug: Freitag 23.10.2026 · 3 Personen<br>
+        1 Person Rückflug Sa/So · 2 Personen Rückflug Mo/Di
+      </p>
+    </div>
+
+    <!-- Diagramm 1 -->
+    <div class="card">
+      <h2>Preise – 1 Person Rückflug</h2>
+      <div class="legend">
+        <span><div class="dot" style="background:#4ade80"></div>Economy</span>
+        <span><div class="dot" style="background:#fb923c"></div>Premium Economy</span>
+        <span><div class="dot" style="background:#c084fc"></div>Business</span>
+      </div>
+      <canvas id="chart1p"></canvas>
+    </div>
+
+    <!-- Diagramm 2 -->
+    <div class="card">
+      <h2>Preise – 2 Personen Rückflug</h2>
+      <div class="legend">
+        <span><div class="dot" style="background:#4ade80"></div>Economy</span>
+        <span><div class="dot" style="background:#fb923c"></div>Premium Economy</span>
+        <span><div class="dot" style="background:#c084fc"></div>Business</span>
+      </div>
+      <canvas id="chart2p"></canvas>
+    </div>
+
+    <!-- Tabelle -->
+    <div class="card" style="grid-column: 1 / -1;">
+      <h2>Alle Kombinationen</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Personen</th>
+            <th>Rückflug</th>
+            <th>Kabine</th>
+            <th>Preis</th>
+            <th>Airline</th>
+          </tr>
+        </
