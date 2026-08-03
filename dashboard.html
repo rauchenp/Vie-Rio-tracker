@@ -11,9 +11,6 @@
       --card: #1e293b;
       --text: #e2e8f0;
       --accent: #38bdf8;
-      --green: #4ade80;
-      --orange: #fb923c;
-      --purple: #c084fc;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -77,6 +74,7 @@
     }
     .legend span { display: flex; align-items: center; gap: 6px; }
     .dot { width: 12px; height: 12px; border-radius: 3px; }
+    .best { color: #4ade80; font-weight: 700; }
     footer {
       text-align: center;
       margin-top: 32px;
@@ -91,13 +89,12 @@
       <h1>✈️ Wien → Rio de Janeiro</h1>
       <p class="subtitle">
         Hinflug: Freitag 23.10.2026 · 3 Personen<br>
-        1 Person Rückflug Sa/So · 2 Personen Rückflug Mo/Di
+        Stand: 03.08.2026 12:52 CEST · Tracker läuft alle 6 Stunden
       </p>
     </div>
 
-    <!-- Diagramm 1 -->
     <div class="card">
-      <h2>Preise – 1 Person Rückflug</h2>
+      <h2>1 Person – Rückflug</h2>
       <div class="legend">
         <span><div class="dot" style="background:#4ade80"></div>Economy</span>
         <span><div class="dot" style="background:#fb923c"></div>Premium Economy</span>
@@ -106,9 +103,8 @@
       <canvas id="chart1p"></canvas>
     </div>
 
-    <!-- Diagramm 2 -->
     <div class="card">
-      <h2>Preise – 2 Personen Rückflug</h2>
+      <h2>2 Personen – Rückflug</h2>
       <div class="legend">
         <span><div class="dot" style="background:#4ade80"></div>Economy</span>
         <span><div class="dot" style="background:#fb923c"></div>Premium Economy</span>
@@ -117,9 +113,8 @@
       <canvas id="chart2p"></canvas>
     </div>
 
-    <!-- Tabelle -->
     <div class="card" style="grid-column: 1 / -1;">
-      <h2>Alle Kombinationen</h2>
+      <h2>Alle aktuellen Preise</h2>
       <table>
         <thead>
           <tr>
@@ -129,4 +124,102 @@
             <th>Preis</th>
             <th>Airline</th>
           </tr>
-        </
+        </thead>
+        <tbody id="priceTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    Daten aus prices.csv · Automatisch alle 6 Stunden aktualisiert
+  </footer>
+
+  <script>
+    // Aktuelle Preise vom 03.08.2026 10:52 UTC
+    const data = [
+      // 1 Person
+      { adults: 1, returnDate: "31.10.", cabin: "economy", price: 1530, airline: "Iberia" },
+      { adults: 1, returnDate: "31.10.", cabin: "premium-economy", price: 2766, airline: "Austrian / ITA" },
+      { adults: 1, returnDate: "31.10.", cabin: "business", price: 3696, airline: "Austrian / ITA" },
+      { adults: 1, returnDate: "01.11.", cabin: "economy", price: 1249, airline: "Iberia" },
+      { adults: 1, returnDate: "01.11.", cabin: "premium-economy", price: 2753, airline: "Austrian / ITA" },
+      { adults: 1, returnDate: "01.11.", cabin: "business", price: 3696, airline: "Austrian / ITA" },
+      // 2 Personen
+      { adults: 2, returnDate: "02.11.", cabin: "economy", price: 1968, airline: "Iberia" },
+      { adults: 2, returnDate: "02.11.", cabin: "premium-economy", price: 5393, airline: "Air France" },
+      { adults: 2, returnDate: "02.11.", cabin: "business", price: 8547, airline: "Air France" },
+      { adults: 2, returnDate: "03.11.", cabin: "economy", price: 2470, airline: "Iberia" },
+      { adults: 2, returnDate: "03.11.", cabin: "premium-economy", price: 5506, airline: "Austrian / ITA" },
+      { adults: 2, returnDate: "03.11.", cabin: "business", price: 8547, airline: "Air France" },
+    ];
+
+    // Tabelle füllen
+    const tbody = document.getElementById("priceTable");
+    data.forEach(row => {
+      const cabinClass = row.cabin === "economy" ? "eco" :
+                         row.cabin === "premium-economy" ? "prem" : "biz";
+      const cabinLabel = row.cabin === "economy" ? "Economy" :
+                         row.cabin === "premium-economy" ? "Premium Eco" : "Business";
+      const isBest = (row.adults === 1 && row.cabin === "economy" && row.returnDate === "01.11.") ||
+                     (row.adults === 2 && row.cabin === "economy" && row.returnDate === "02.11.");
+      tbody.innerHTML += `
+        <tr>
+          <td>${row.adults} Person${row.adults > 1 ? "en" : ""}</td>
+          <td>${row.returnDate}</td>
+          <td><span class="badge ${cabinClass}">${cabinLabel}</span></td>
+          <td class="${isBest ? 'best' : ''}">${row.price.toLocaleString('de-DE')} €</td>
+          <td>${row.airline}</td>
+        </tr>`;
+    });
+
+    function getPrices(adults, cabin) {
+      return data
+        .filter(d => d.adults === adults && d.cabin === cabin)
+        .map(d => d.price);
+    }
+
+    const labels1p = ["31.10. (Sa)", "01.11. (So)"];
+    const labels2p = ["02.11. (Mo)", "03.11. (Di)"];
+
+    new Chart(document.getElementById("chart1p"), {
+      type: "bar",
+      data: {
+        labels: labels1p,
+        datasets: [
+          { label: "Economy", data: getPrices(1, "economy"), backgroundColor: "#4ade80" },
+          { label: "Premium Economy", data: getPrices(1, "premium-economy"), backgroundColor: "#fb923c" },
+          { label: "Business", data: getPrices(1, "business"), backgroundColor: "#c084fc" },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+          x: { ticks: { color: "#94a3b8" }, grid: { display: false } }
+        }
+      }
+    });
+
+    new Chart(document.getElementById("chart2p"), {
+      type: "bar",
+      data: {
+        labels: labels2p,
+        datasets: [
+          { label: "Economy", data: getPrices(2, "economy"), backgroundColor: "#4ade80" },
+          { label: "Premium Economy", data: getPrices(2, "premium-economy"), backgroundColor: "#fb923c" },
+          { label: "Business", data: getPrices(2, "business"), backgroundColor: "#c084fc" },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+          x: { ticks: { color: "#94a3b8" }, grid: { display: false } }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
