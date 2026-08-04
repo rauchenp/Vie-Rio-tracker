@@ -21,27 +21,13 @@
       line-height: 1.5;
     }
     h1 { font-size: 1.5rem; margin-bottom: 6px; }
-    .subtitle { color: #94a3b8; margin-bottom: 16px; font-size: 0.9rem; }
-    .btn {
-      display: block;
-      width: 100%;
-      background: #22c55e;
-      color: #052e16;
-      text-align: center;
-      padding: 14px;
-      border-radius: 12px;
-      font-weight: 700;
-      font-size: 1rem;
-      text-decoration: none;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 12px rgba(34,197,94,0.3);
-    }
-    .btn:active { transform: scale(0.98); }
+    .subtitle { color: #94a3b8; margin-bottom: 20px; font-size: 0.9rem; }
     .card {
       background: var(--card);
       border-radius: 14px;
       padding: 18px;
       margin-bottom: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
     }
     .card h2 {
       font-size: 1.05rem;
@@ -93,13 +79,8 @@
   <h1>✈️ Wien → Rio de Janeiro</h1>
   <p class="subtitle">
     Hinflug: Freitag 23.10.2026<br>
-    Automatisch alle 4 Stunden
+    Stand: 03.08.2026 · Update alle 4 Stunden
   </p>
-
-  <!-- Manueller Start-Button -->
-  <a class="btn" href="https://github.com/rauchenp/Vie-Rio-tracker/actions/workflows/track.yml" target="_blank">
-    🔄 Jetzt Preise aktualisieren
-  </a>
 
   <!-- Hauptansicht: nur Economy -->
   <div class="card">
@@ -147,7 +128,7 @@
     </table>
   </div>
 
-  <!-- Einklappbar: Premium + Business -->
+  <!-- Einklappbar: Premium Economy + Business -->
   <details>
     <summary>Premium Economy & Business (Vergleich)</summary>
     <div class="details-content">
@@ -192,10 +173,11 @@
   </details>
 
   <footer>
-    Tracker läuft alle 4 Stunden · Nach dem manuellen Lauf die Seite neu laden
+    Tracker läuft alle 4 Stunden · Daten aus prices.csv
   </footer>
 
   <script>
+    // Economy Chart (Hauptansicht)
     new Chart(document.getElementById("chartEconomy"), {
       type: "bar",
       data: {
@@ -216,6 +198,7 @@
       }
     });
 
+    // Premium + Business Chart (nur im ausgeklappten Bereich)
     new Chart(document.getElementById("chartPremiumBusiness"), {
       type: "bar",
       data: {
