@@ -125,10 +125,15 @@
       return entries
         .filter(e => e.persons === persons && e.returnDate === returnDate && e.cabin === cabin && e.ts)
         .sort((a,b) => a.ts.localeCompare(b.ts))
-        .map(e => ({ ts: e.ts, label: e.ts.slice(5, 16), price: e.price }));
+        .map(e => {
+          const d = new Date(e.ts.replace(" ", "T") + "Z");
+          const days = ["So","Mo","Di","Mi","Do","Fr","Sa"];
+          const day = days[d.getUTCDay()];
+          const time = e.ts.slice(11, 16); // HH:MM
+          return { ts: e.ts, label: day + " " + time, price: e.price };
+        });
     }
 
-    // Einfache SVG-Linie ohne externe Bibliothek
     function drawSVGChart(series1, series2) {
       const all = [...series1, ...series2];
       if (all.length < 2) {
@@ -157,7 +162,6 @@
         return "M" + pts.join(" L");
       }
 
-      // Y-Achsen-Beschriftung
       const yTicks = 4;
       let yLabels = "";
       for (let i = 0; i <= yTicks; i++) {
@@ -167,7 +171,6 @@
         yLabels += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#334155" stroke-width="1"/>`;
       }
 
-      // X-Achsen-Labels (nur einige)
       let xLabels = "";
       const step = Math.max(1, Math.floor(labels.length / 5));
       labels.forEach((lab, i) => {
@@ -204,7 +207,6 @@
           { persons:2, ret:"2026-11-03", label:"Amelie + David", short:"03.11." },
         ];
 
-        // Economy Tabelle
         let ecoHtml = "";
         combos.forEach(c => {
           const { latest, prev } = getLatestAndPrev(entries, c.persons, c.ret, "economy");
@@ -219,7 +221,6 @@
         });
         document.getElementById("ecoTable").innerHTML = ecoHtml;
 
-        // Premium + Business
         let premHtml = "";
         combos.forEach(c => {
           const prem = getLatestAndPrev(entries, c.persons, c.ret, "premium-economy");
@@ -233,7 +234,6 @@
         });
         document.getElementById("premTable").innerHTML = premHtml;
 
-        // SVG-Trendlinie
         const s1 = buildSeries(entries, 1, "2026-11-01", "economy");
         const s2 = buildSeries(entries, 2, "2026-11-02", "economy");
         drawSVGChart(s1, s2);
