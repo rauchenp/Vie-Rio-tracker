@@ -128,80 +128,83 @@
         .map(e => {
           const d = new Date(e.ts.replace(" ", "T") + "Z");
           const days = ["So","Mo","Di","Mi","Do","Fr","Sa"];
-          const day = days[d.getUTCDay()];
-          const time = e.ts.slice(11, 16);
-          return { ts: e.ts, label: day + " " + time, price: e.price };
+          return {
+            ts: e.ts,
+            label: days[d.getUTCDay()] + " " + e.ts.slice(11, 16),
+            price: e.price
+          };
         });
     }
 
     function drawSVGChart(series1, series2) {
-      const allPoints = [];
-      series1.forEach(s => allPoints.push({ ...s, series: 1 }));
-      series2.forEach(s => allPoints.push({ ...s, series: 2 }));
+      // Alle Punkte sammeln und NACH TIMESTAMP sortieren
+      const points = [];
+      series1.forEach(s => points.push({ ts: s.ts, label: s.label, price: s.price, series: 1 }));
+      series2.forEach(s => points.push({ ts: s.ts, label: s.label, price: s.price, series: 2 }));
 
-      if (allPoints.length < 2) {
-        document.getElementById("chartWrap").innerHTML = "<p style='color:#94a3b8;font-size:0.85rem'>Noch zu wenig Daten für eine Linie.</p>";
+      if (points.length < 2) {
+        document.getElementById("chartWrap").innerHTML = "<p style='color:#94a3b8;font-size:0.85rem'>Noch zu wenig Daten.</p>";
         return;
       }
 
-      // Chronologisch sortieren (links = älter → rechts = neuer)
-      allPoints.sort((a, b) => a.ts.localeCompare(b.ts));
+      points.sort((a, b) => a.ts.localeCompare(b.ts)); // links = älter
 
+      // Einzigartige Labels in der Reihenfolge ihres ersten Auftretens (chronologisch)
       const labels = [];
-      const seen = new Set();
-      allPoints.forEach(p => {
-        if (!seen.has(p.label)) {
-          seen.add(p.label);
+      const labelTs = {}; // label → earliest ts
+      points.forEach(p => {
+        if (!labelTs[p.label]) {
+          labelTs[p.label] = p.ts;
           labels.push(p.label);
         }
       });
 
-      const prices = allPoints.map(p => p.price);
-      const minP = Math.min(...prices) * 0.95;
-      const maxP = Math.max(...prices) * 1.05;
+      const prices = points.map(p => p.price);
+      const minP = Math.min(...prices) * 0.92;
+      const maxP = Math.max(...prices) * 1.08;
 
-      const W = 600, H = 200, padL = 45, padR = 15, padT = 15, padB = 35;
+      const W = 640, H = 210, padL = 48, padR = 16, padT = 12, padB = 36;
       const plotW = W - padL - padR;
       const plotH = H - padT - padB;
 
-      function x(i) { return padL + (i / Math.max(labels.length - 1, 1)) * plotW; }
-      function y(p) { return padT + plotH - ((p - minP) / (maxP - minP || 1)) * plotH; }
+      function xPos(i) { return padL + (i / Math.max(labels.length - 1, 1)) * plotW; }
+      function yPos(p) { return padT + plotH - ((p - minP) / (maxP - minP || 1)) * plotH; }
 
-      function path(seriesNum) {
+      function makePath(seriesNum) {
         const pts = [];
         labels.forEach((lab, i) => {
-          const found = allPoints.find(p => p.label === lab && p.series === seriesNum);
-          if (found) pts.push(`${x(i)},${y(found.price)}`);
+          // nimm den Punkt dieser Serie mit diesem Label (erster Treffer reicht)
+          const found = points.find(p => p.label === lab && p.series === seriesNum);
+          if (found) pts.push(xPos(i) + "," + yPos(found.price));
         });
-        if (pts.length < 2) return "";
-        return "M" + pts.join(" L");
+        return pts.length >= 2 ? "M" + pts.join(" L") : "";
       }
 
-      const yTicks = 4;
-      let yLabels = "";
-      for (let i = 0; i <= yTicks; i++) {
-        const val = minP + (maxP - minP) * (i / yTicks);
-        const yy = y(val);
-        yLabels += `<text x="${padL - 6}" y="${yy + 4}" text-anchor="end" fill="#94a3b8" font-size="10">${Math.round(val)}</text>`;
-        yLabels += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#334155" stroke-width="1"/>`;
+      // Y-Achse
+      let grid = "";
+      for (let i = 0; i <= 4; i++) {
+        const val = minP + (maxP - minP) * (i / 4);
+        const yy = yPos(val);
+        grid += `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="#334155" stroke-width="1"/>`;
+        grid += `<text x="${padL-6}" y="${yy+3}" text-anchor="end" fill="#94a3b8" font-size="10">${Math.round(val)}</text>`;
       }
 
-      let xLabels = "";
-      const step = Math.max(1, Math.floor(labels.length / 5));
+      // X-Achse (nur einige Labels)
+      let xLab = "";
+      const step = Math.max(1, Math.floor(labels.length / 6));
       labels.forEach((lab, i) => {
         if (i % step === 0 || i === labels.length - 1) {
-          xLabels += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" fill="#94a3b8" font-size="9">${lab}</text>`;
+          xLab += `<text x="${xPos(i)}" y="${H-10}" text-anchor="middle" fill="#94a3b8" font-size="9">${lab}</text>`;
         }
       });
 
-      const svg = `
+      document.getElementById("chartWrap").innerHTML = `
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
-          ${yLabels}
-          <path d="${path(1)}" fill="none" stroke="#22c55e" stroke-width="2.5"/>
-          <path d="${path(2)}" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
-          ${xLabels}
+          ${grid}
+          <path d="${makePath(1)}" fill="none" stroke="#22c55e" stroke-width="2.5"/>
+          <path d="${makePath(2)}" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+          ${xLab}
         </svg>`;
-      document.getElementById("chartWrap").innerHTML = svg;
     }
 
     async function load() {
@@ -249,9 +252,10 @@
         });
         document.getElementById("premTable").innerHTML = premHtml;
 
-        const s1 = buildSeries(entries, 1, "2026-11-01", "economy");
-        const s2 = buildSeries(entries, 2, "2026-11-02", "economy");
-        drawSVGChart(s1, s2);
+        drawSVGChart(
+          buildSeries(entries, 1, "2026-11-01", "economy"),
+          buildSeries(entries, 2, "2026-11-02", "economy")
+        );
 
       } catch (err) {
         document.getElementById("status").textContent = "Fehler: " + err.message;
