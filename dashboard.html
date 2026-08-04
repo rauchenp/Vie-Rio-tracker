@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vie → Rio Tracker</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --accent:#38bdf8; }
     * { box-sizing:border-box; margin:0; padding:0; }
@@ -86,15 +86,20 @@
     function parseCSV(text) {
       const lines = text.trim().split("\n").slice(1);
       const entries = [];
+
       for (const line of lines) {
-        const m = line.match(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?(1P|2P).*?Rück (2026-\d{2}-\d{2}).*?(economy|premium-economy|business).*?(\d{3,5})/);
+        // Suche nach Label + Preis am Ende der relevanten Felder
+        // Beispiel: ...1P | Rück 2026-10-31 | economy,1,2026-10-31,economy,1530,...
+        const m = line.match(/(1P|2P)\s*\|\s*Rück\s*(2026-\d{2}-\d{2})\s*\|\s*(economy|premium-economy|business).*?,(\d{3,5}),/);
         if (m) {
+          // Timestamp am Anfang der Zeile
+          const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
           entries.push({
-            ts: m[1],
-            persons: m[2] === "1P" ? 1 : 2,
-            returnDate: m[3],
-            cabin: m[4],
-            price: parseInt(m[5], 10)
+            ts: tsMatch ? tsMatch[1] : "",
+            persons: m[1] === "1P" ? 1 : 2,
+            returnDate: m[2],
+            cabin: m[3],
+            price: parseInt(m[4], 10)
           });
         }
       }
@@ -128,8 +133,8 @@
           return;
         }
 
-        const lastTs = entries.map(e => e.ts).sort().pop();
-        document.getElementById("status").textContent = "Letzter Stand: " + lastTs + " UTC";
+        const lastTs = entries.map(e => e.ts).filter(Boolean).sort().pop() || "unbekannt";
+        document.getElementById("status").textContent = "Letzter Stand: " + lastTs + " UTC · " + entries.length + " Einträge";
 
         const combos = [
           { persons:1, ret:"2026-10-31", label:"Bettina", short:"31.10." },
@@ -138,41 +143,45 @@
           { persons:2, ret:"2026-11-03", label:"Amelie + David", short:"03.11." },
         ];
 
+        // Economy
         const ecoPrices = [];
         const ecoLabels = [];
         let ecoHtml = "";
 
         combos.forEach(c => {
           const { latest, prev } = getLatestAndPrev(entries, c.persons, c.ret, "economy");
-          const price = latest ? latest.price : "–";
+          const price = latest ? latest.price : null;
           const isBest = (c.persons===1 && c.ret==="2026-11-01") || (c.persons===2 && c.ret==="2026-11-02");
           ecoHtml += `<tr>
             <td>${c.label}</td>
             <td>${c.short}</td>
-            <td class="${isBest ? 'best' : ''}">${typeof price === 'number' ? price.toLocaleString('de-DE') : price} €</td>
+            <td class="${isBest && price ? 'best' : ''}">${price ? price.toLocaleString('de-DE') + " €" : "–"}</td>
             <td>${trendHtml(latest, prev)}</td>
           </tr>`;
           ecoLabels.push(c.label.split(" ")[0] + "\n" + c.short);
-          ecoPrices.push(latest ? latest.price : 0);
+          ecoPrices.push(price || 0);
         });
         document.getElementById("ecoTable").innerHTML = ecoHtml;
 
-        new Chart(document.getElementById("chartEco"), {
-          type: "bar",
-          data: {
-            labels: ecoLabels,
-            datasets: [{ data: ecoPrices, backgroundColor: ["#4ade80","#22c55e","#4ade80","#86efac"] }]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-              y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
-              x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { display: false } }
+        if (typeof Chart !== "undefined") {
+          new Chart(document.getElementById("chartEco"), {
+            type: "bar",
+            data: {
+              labels: ecoLabels,
+              datasets: [{ data: ecoPrices, backgroundColor: ["#4ade80","#22c55e","#4ade80","#86efac"] }]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { display: false } },
+              scales: {
+                y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+                x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { display: false } }
+              }
             }
-          }
-        });
+          });
+        }
 
+        // Premium + Business
         let premHtml = "";
         const premData = [], bizData = [];
         combos.forEach(c => {
@@ -189,31 +198,39 @@
         });
         document.getElementById("premTable").innerHTML = premHtml;
 
-        new Chart(document.getElementById("chartPrem"), {
-          type: "bar",
-          data: {
-            labels: ["B 31.10.","B 01.11.","A+D 02.11.","A+D 03.11."],
-            datasets: [
-              { label: "Premium Eco", data: premData, backgroundColor: "#fb923c" },
-              { label: "Business", data: bizData, backgroundColor: "#c084fc" }
-            ]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { labels: { color: "#94a3b8" } } },
-            scales: {
-              y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
-              x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { display: false } }
+        if (typeof Chart !== "undefined") {
+          new Chart(document.getElementById("chartPrem"), {
+            type: "bar",
+            data: {
+              labels: ["B 31.10.","B 01.11.","A+D 02.11.","A+D 03.11."],
+              datasets: [
+                { label: "Premium Eco", data: premData, backgroundColor: "#fb923c" },
+                { label: "Business", data: bizData, backgroundColor: "#c084fc" }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#94a3b8" } } },
+              scales: {
+                y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+                x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { display: false } }
+              }
             }
-          }
-        });
+          });
+        }
 
       } catch (err) {
         document.getElementById("status").textContent = "Fehler beim Laden: " + err.message;
+        console.error(err);
       }
     }
 
-    load();
+    // Warte kurz, bis Chart.js geladen ist
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", load);
+    } else {
+      setTimeout(load, 100);
+    }
   </script>
 </body>
 </html>
