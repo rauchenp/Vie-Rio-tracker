@@ -129,20 +129,34 @@
           const d = new Date(e.ts.replace(" ", "T") + "Z");
           const days = ["So","Mo","Di","Mi","Do","Fr","Sa"];
           const day = days[d.getUTCDay()];
-          const time = e.ts.slice(11, 16); // HH:MM
+          const time = e.ts.slice(11, 16);
           return { ts: e.ts, label: day + " " + time, price: e.price };
         });
     }
 
     function drawSVGChart(series1, series2) {
-      const all = [...series1, ...series2];
-      if (all.length < 2) {
+      const allPoints = [];
+      series1.forEach(s => allPoints.push({ ...s, series: 1 }));
+      series2.forEach(s => allPoints.push({ ...s, series: 2 }));
+
+      if (allPoints.length < 2) {
         document.getElementById("chartWrap").innerHTML = "<p style='color:#94a3b8;font-size:0.85rem'>Noch zu wenig Daten für eine Linie.</p>";
         return;
       }
 
-      const labels = [...new Set([...series1.map(s => s.label), ...series2.map(s => s.label)])].sort();
-      const prices = all.map(s => s.price);
+      // Chronologisch sortieren (links = älter → rechts = neuer)
+      allPoints.sort((a, b) => a.ts.localeCompare(b.ts));
+
+      const labels = [];
+      const seen = new Set();
+      allPoints.forEach(p => {
+        if (!seen.has(p.label)) {
+          seen.add(p.label);
+          labels.push(p.label);
+        }
+      });
+
+      const prices = allPoints.map(p => p.price);
       const minP = Math.min(...prices) * 0.95;
       const maxP = Math.max(...prices) * 1.05;
 
@@ -153,11 +167,12 @@
       function x(i) { return padL + (i / Math.max(labels.length - 1, 1)) * plotW; }
       function y(p) { return padT + plotH - ((p - minP) / (maxP - minP || 1)) * plotH; }
 
-      function path(series) {
-        const pts = labels.map((lab, i) => {
-          const found = series.find(s => s.label === lab);
-          return found ? `${x(i)},${y(found.price)}` : null;
-        }).filter(Boolean);
+      function path(seriesNum) {
+        const pts = [];
+        labels.forEach((lab, i) => {
+          const found = allPoints.find(p => p.label === lab && p.series === seriesNum);
+          if (found) pts.push(`${x(i)},${y(found.price)}`);
+        });
         if (pts.length < 2) return "";
         return "M" + pts.join(" L");
       }
@@ -182,8 +197,8 @@
       const svg = `
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
           ${yLabels}
-          <path d="${path(series1)}" fill="none" stroke="#22c55e" stroke-width="2.5"/>
-          <path d="${path(series2)}" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+          <path d="${path(1)}" fill="none" stroke="#22c55e" stroke-width="2.5"/>
+          <path d="${path(2)}" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
           ${xLabels}
         </svg>`;
       document.getElementById("chartWrap").innerHTML = svg;
