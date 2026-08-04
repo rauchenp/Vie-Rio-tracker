@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vie → Rio Tracker</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --accent:#38bdf8; }
     * { box-sizing:border-box; margin:0; padding:0; }
@@ -30,9 +29,12 @@
     details[open] summary::after { content:"▲"; }
     .details-content { padding:0 16px 14px; }
     #status { font-size:0.8rem; color:#94a3b8; margin-bottom:12px; }
-    #chartNote { font-size:0.8rem; color:#94a3b8; margin-top:8px; }
     footer { text-align:center; margin-top:20px; color:#64748b; font-size:0.75rem; }
-    canvas { width:100% !important; max-height:280px; }
+    .legend { display:flex; gap:16px; margin-bottom:10px; font-size:0.8rem; }
+    .legend span { display:flex; align-items:center; gap:6px; }
+    .dot { width:12px; height:3px; border-radius:2px; }
+    #chartWrap { width:100%; overflow-x:auto; }
+    svg { display:block; width:100%; height:220px; }
   </style>
 </head>
 <body>
@@ -42,42 +44,26 @@
       <p class="sub">Hinflug Fr 23.10.2026 · Update alle 4 h</p>
     </div>
     <a href="https://github.com/rauchenp/Vie-Rio-tracker/actions/workflows/track.yml" 
-       target="_blank"
-       title="Preise aktualisieren"
-       style="
-         display:inline-block;
-         width:34px;
-         height:34px;
-         background:#1e293b;
-         border:1px solid #334155;
-         border-radius:8px;
-         text-align:center;
-         line-height:32px;
-         text-decoration:none;
-         font-size:16px;
-         color:#94a3b8;
-         flex-shrink:0;
-       ">🔄</a>
+       target="_blank" title="Preise aktualisieren"
+       style="display:inline-block;width:34px;height:34px;background:#1e293b;border:1px solid #334155;border-radius:8px;text-align:center;line-height:32px;text-decoration:none;font-size:16px;color:#94a3b8;flex-shrink:0;">🔄</a>
   </div>
 
   <div id="status">Lade Preise…</div>
 
   <div class="card">
     <h2>Preisentwicklung (Economy)</h2>
-    <canvas id="chartWeek" height="200"></canvas>
-    <div id="chartNote"></div>
+    <div class="legend">
+      <span><div class="dot" style="background:#22c55e"></div>Bettina 01.11.</span>
+      <span><div class="dot" style="background:#38bdf8"></div>Amelie+David 02.11.</span>
+    </div>
+    <div id="chartWrap"></div>
   </div>
 
   <div class="card">
     <h2>Economy – Preise + Trend</h2>
     <table>
       <thead>
-        <tr>
-          <th>Person</th>
-          <th>Rückflug</th>
-          <th>Preis</th>
-          <th>Trend</th>
-        </tr>
+        <tr><th>Person</th><th>Rückflug</th><th>Preis</th><th>Trend</th></tr>
       </thead>
       <tbody id="ecoTable"></tbody>
     </table>
@@ -88,12 +74,7 @@
     <div class="details-content">
       <table>
         <thead>
-          <tr>
-            <th>Person</th>
-            <th>Rückflug</th>
-            <th>Premium Eco</th>
-            <th>Business</th>
-          </tr>
+          <tr><th>Person</th><th>Rückflug</th><th>Premium Eco</th><th>Business</th></tr>
         </thead>
         <tbody id="premTable"></tbody>
       </table>
@@ -144,10 +125,65 @@
       return entries
         .filter(e => e.persons === persons && e.returnDate === returnDate && e.cabin === cabin && e.ts)
         .sort((a,b) => a.ts.localeCompare(b.ts))
-        .map(e => ({
-          label: e.ts.slice(5, 16),
-          price: e.price
-        }));
+        .map(e => ({ ts: e.ts, label: e.ts.slice(5, 16), price: e.price }));
+    }
+
+    // Einfache SVG-Linie ohne externe Bibliothek
+    function drawSVGChart(series1, series2) {
+      const all = [...series1, ...series2];
+      if (all.length < 2) {
+        document.getElementById("chartWrap").innerHTML = "<p style='color:#94a3b8;font-size:0.85rem'>Noch zu wenig Daten für eine Linie.</p>";
+        return;
+      }
+
+      const labels = [...new Set([...series1.map(s => s.label), ...series2.map(s => s.label)])].sort();
+      const prices = all.map(s => s.price);
+      const minP = Math.min(...prices) * 0.95;
+      const maxP = Math.max(...prices) * 1.05;
+
+      const W = 600, H = 200, padL = 45, padR = 15, padT = 15, padB = 35;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      function x(i) { return padL + (i / Math.max(labels.length - 1, 1)) * plotW; }
+      function y(p) { return padT + plotH - ((p - minP) / (maxP - minP || 1)) * plotH; }
+
+      function path(series) {
+        const pts = labels.map((lab, i) => {
+          const found = series.find(s => s.label === lab);
+          return found ? `${x(i)},${y(found.price)}` : null;
+        }).filter(Boolean);
+        if (pts.length < 2) return "";
+        return "M" + pts.join(" L");
+      }
+
+      // Y-Achsen-Beschriftung
+      const yTicks = 4;
+      let yLabels = "";
+      for (let i = 0; i <= yTicks; i++) {
+        const val = minP + (maxP - minP) * (i / yTicks);
+        const yy = y(val);
+        yLabels += `<text x="${padL - 6}" y="${yy + 4}" text-anchor="end" fill="#94a3b8" font-size="10">${Math.round(val)}</text>`;
+        yLabels += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#334155" stroke-width="1"/>`;
+      }
+
+      // X-Achsen-Labels (nur einige)
+      let xLabels = "";
+      const step = Math.max(1, Math.floor(labels.length / 5));
+      labels.forEach((lab, i) => {
+        if (i % step === 0 || i === labels.length - 1) {
+          xLabels += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" fill="#94a3b8" font-size="9">${lab}</text>`;
+        }
+      });
+
+      const svg = `
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+          ${yLabels}
+          <path d="${path(series1)}" fill="none" stroke="#22c55e" stroke-width="2.5"/>
+          <path d="${path(series2)}" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+          ${xLabels}
+        </svg>`;
+      document.getElementById("chartWrap").innerHTML = svg;
     }
 
     async function load() {
@@ -197,80 +233,10 @@
         });
         document.getElementById("premTable").innerHTML = premHtml;
 
-        // Trendlinie
-        function drawLine() {
-          if (!window.Chart) {
-            document.getElementById("chartNote").textContent = "Chart konnte nicht geladen werden.";
-            return;
-          }
-
-          const s1 = buildSeries(entries, 1, "2026-11-01", "economy");
-          const s2 = buildSeries(entries, 2, "2026-11-02", "economy");
-          const allLabels = [...new Set([...s1.map(x => x.label), ...s2.map(x => x.label)])].sort();
-
-          function align(series) {
-            return allLabels.map(l => {
-              const found = series.find(x => x.label === l);
-              return found ? found.price : null;
-            });
-          }
-
-          if (allLabels.length < 2) {
-            document.getElementById("chartNote").textContent = "Noch zu wenig Verlaufsdaten für eine Linie.";
-            return;
-          }
-
-          new Chart(document.getElementById("chartWeek"), {
-            type: "line",
-            data: {
-              labels: allLabels,
-              datasets: [
-                {
-                  label: "Bettina 01.11.",
-                  data: align(s1),
-                  borderColor: "#22c55e",
-                  tension: 0.25,
-                  spanGaps: true,
-                  pointRadius: 4,
-                  fill: false
-                },
-                {
-                  label: "Amelie + David 02.11.",
-                  data: align(s2),
-                  borderColor: "#38bdf8",
-                  tension: 0.25,
-                  spanGaps: true,
-                  pointRadius: 4,
-                  fill: false
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: { labels: { color: "#94a3b8", boxWidth: 12 } }
-              },
-              scales: {
-                y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
-                x: { ticks: { color: "#94a3b8", maxRotation: 45, font: { size: 10 } }, grid: { display: false } }
-              }
-            }
-          });
-        }
-
-        if (window.Chart) {
-          drawLine();
-        } else {
-          let tries = 0;
-          const t = setInterval(() => {
-            tries++;
-            if (window.Chart || tries > 25) {
-              clearInterval(t);
-              drawLine();
-            }
-          }, 150);
-        }
+        // SVG-Trendlinie
+        const s1 = buildSeries(entries, 1, "2026-11-01", "economy");
+        const s2 = buildSeries(entries, 2, "2026-11-02", "economy");
+        drawSVGChart(s1, s2);
 
       } catch (err) {
         document.getElementById("status").textContent = "Fehler: " + err.message;
