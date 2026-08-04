@@ -37,7 +37,7 @@
     .details-content { padding:0 16px 14px; }
     #status { font-size:0.8rem; color:#94a3b8; margin-bottom:10px; }
     footer { text-align:center; margin-top:20px; color:#64748b; font-size:0.75rem; }
-    canvas { max-height:240px; }
+    canvas { max-height:260px; }
   </style>
 </head>
 <body>
@@ -49,6 +49,12 @@
   </a>
 
   <div id="status">Lade Preise…</div>
+
+  <!-- NEU: Wochen-Trendlinie -->
+  <div class="card">
+    <h2>Preisentwicklung (letzte Woche) – Economy</h2>
+    <canvas id="chartWeek"></canvas>
+  </div>
 
   <div class="card">
     <h2>Economy – aktuell</h2>
@@ -86,9 +92,7 @@
     function parseCSV(text) {
       const lines = text.trim().split("\n").slice(1);
       const entries = [];
-
       for (const line of lines) {
-        // Sehr präzise: 1P | Rück 2026-10-31 | economy,1,2026-10-31,economy,1530,
         const m = line.match(/(1P|2P)\s*\|\s*Rück\s+(2026-\d{2}-\d{2})\s*\|\s*(economy|premium-economy|business),(\d+),2026-\d{2}-\d{2},\3,(\d{3,5})/);
         if (m) {
           const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
@@ -120,6 +124,22 @@
       return `<span class="same trend">→ 0 €</span>`;
     }
 
+    function buildWeekSeries(entries, persons, returnDate, cabin) {
+      const filtered = entries
+        .filter(e => e.persons === persons && e.returnDate === returnDate && e.cabin === cabin && e.ts)
+        .sort((a,b) => a.ts.localeCompare(b.ts));
+
+      // nur letzte 7 Tage
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      const recent = filtered.filter(e => new Date(e.ts.replace(" ", "T") + "Z") >= cutoff);
+
+      return {
+        labels: recent.map(e => e.ts.slice(5, 16).replace(" ", " ")), // MM-DD HH:MM
+        data: recent.map(e => e.price)
+      };
+    }
+
     async function load() {
       try {
         const res = await fetch(CSV_URL);
@@ -138,7 +158,60 @@
           { persons:2, ret:"2026-11-03", label:"Amelie + David", short:"03.11." },
         ];
 
-        // Economy
+        // === Wochen-Trendlinie (die zwei wichtigsten) ===
+        if (window.Chart) {
+          const s1 = buildWeekSeries(entries, 1, "2026-11-01", "economy"); // Bettina 01.11
+          const s2 = buildWeekSeries(entries, 2, "2026-11-02", "economy"); // Amelie+David 02.11
+
+          // gemeinsame Labels (Union der Zeitpunkte)
+          const allLabels = [...new Set([...s1.labels, ...s2.labels])].sort();
+
+          function align(series, labels) {
+            return labels.map(l => {
+              const idx = series.labels.indexOf(l);
+              return idx >= 0 ? series.data[idx] : null;
+            });
+          }
+
+          new Chart(document.getElementById("chartWeek"), {
+            type: "line",
+            data: {
+              labels: allLabels,
+              datasets: [
+                {
+                  label: "Bettina 01.11.",
+                  data: align(s1, allLabels),
+                  borderColor: "#22c55e",
+                  backgroundColor: "rgba(34,197,94,0.15)",
+                  tension: 0.3,
+                  spanGaps: true,
+                  pointRadius: 3
+                },
+                {
+                  label: "Amelie+David 02.11.",
+                  data: align(s2, allLabels),
+                  borderColor: "#38bdf8",
+                  backgroundColor: "rgba(56,189,248,0.15)",
+                  tension: 0.3,
+                  spanGaps: true,
+                  pointRadius: 3
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { labels: { color: "#94a3b8" } }
+              },
+              scales: {
+                y: { beginAtZero: false, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+                x: { ticks: { color: "#94a3b8", maxRotation: 45, font: { size: 9 } }, grid: { display: false } }
+              }
+            }
+          });
+        }
+
+        // Economy Balken + Tabelle
         const ecoPrices = [], ecoLabels = [];
         let ecoHtml = "";
 
