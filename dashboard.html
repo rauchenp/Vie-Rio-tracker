@@ -4,17 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vie → Rio Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --accent:#38bdf8; }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); padding:16px; line-height:1.45; }
     h1 { font-size:1.4rem; margin-bottom:4px; }
-    .sub { color:#94a3b8; font-size:0.85rem; margin-bottom:14px; }
-    .btn {
-      display:block; width:100%; background:#22c55e; color:#052e16;
-      text-align:center; padding:13px; border-radius:12px; font-weight:700;
-      text-decoration:none; margin-bottom:18px;
-    }
+    .sub { color:#94a3b8; font-size:0.85rem; margin-bottom:10px; }
     .card { background:var(--card); border-radius:14px; padding:16px; margin-bottom:14px; }
     .card h2 { font-size:1rem; color:var(--accent); margin-bottom:12px; }
     table { width:100%; border-collapse:collapse; font-size:0.88rem; }
@@ -34,18 +30,43 @@
     details[open] summary::after { content:"▲"; }
     .details-content { padding:0 16px 14px; }
     #status { font-size:0.8rem; color:#94a3b8; margin-bottom:12px; }
+    #chartNote { font-size:0.8rem; color:#94a3b8; margin-top:8px; }
     footer { text-align:center; margin-top:20px; color:#64748b; font-size:0.75rem; }
+    canvas { width:100% !important; max-height:280px; }
   </style>
 </head>
 <body>
-  <h1>✈️ Wien → Rio</h1>
-  <p class="sub">Hinflug Fr 23.10.2026 · Update alle 4 h</p>
-
-  <a class="btn" href="https://github.com/rauchenp/Vie-Rio-tracker/actions/workflows/track.yml" target="_blank">
-    🔄 Jetzt Preise aktualisieren
-  </a>
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+    <div>
+      <h1>✈️ Wien → Rio</h1>
+      <p class="sub">Hinflug Fr 23.10.2026 · Update alle 4 h</p>
+    </div>
+    <a href="https://github.com/rauchenp/Vie-Rio-tracker/actions/workflows/track.yml" 
+       target="_blank"
+       title="Preise aktualisieren"
+       style="
+         display:inline-block;
+         width:34px;
+         height:34px;
+         background:#1e293b;
+         border:1px solid #334155;
+         border-radius:8px;
+         text-align:center;
+         line-height:32px;
+         text-decoration:none;
+         font-size:16px;
+         color:#94a3b8;
+         flex-shrink:0;
+       ">🔄</a>
+  </div>
 
   <div id="status">Lade Preise…</div>
+
+  <div class="card">
+    <h2>Preisentwicklung (Economy)</h2>
+    <canvas id="chartWeek" height="200"></canvas>
+    <div id="chartNote"></div>
+  </div>
 
   <div class="card">
     <h2>Economy – Preise + Trend</h2>
@@ -119,6 +140,16 @@
       return `<span class="same">→ 0 €</span>`;
     }
 
+    function buildSeries(entries, persons, returnDate, cabin) {
+      return entries
+        .filter(e => e.persons === persons && e.returnDate === returnDate && e.cabin === cabin && e.ts)
+        .sort((a,b) => a.ts.localeCompare(b.ts))
+        .map(e => ({
+          label: e.ts.slice(5, 16),
+          price: e.price
+        }));
+    }
+
     async function load() {
       try {
         const res = await fetch(CSV_URL);
@@ -137,7 +168,7 @@
           { persons:2, ret:"2026-11-03", label:"Amelie + David", short:"03.11." },
         ];
 
-        // Economy
+        // Economy Tabelle
         let ecoHtml = "";
         combos.forEach(c => {
           const { latest, prev } = getLatestAndPrev(entries, c.persons, c.ret, "economy");
@@ -165,6 +196,81 @@
           </tr>`;
         });
         document.getElementById("premTable").innerHTML = premHtml;
+
+        // Trendlinie
+        function drawLine() {
+          if (!window.Chart) {
+            document.getElementById("chartNote").textContent = "Chart konnte nicht geladen werden.";
+            return;
+          }
+
+          const s1 = buildSeries(entries, 1, "2026-11-01", "economy");
+          const s2 = buildSeries(entries, 2, "2026-11-02", "economy");
+          const allLabels = [...new Set([...s1.map(x => x.label), ...s2.map(x => x.label)])].sort();
+
+          function align(series) {
+            return allLabels.map(l => {
+              const found = series.find(x => x.label === l);
+              return found ? found.price : null;
+            });
+          }
+
+          if (allLabels.length < 2) {
+            document.getElementById("chartNote").textContent = "Noch zu wenig Verlaufsdaten für eine Linie.";
+            return;
+          }
+
+          new Chart(document.getElementById("chartWeek"), {
+            type: "line",
+            data: {
+              labels: allLabels,
+              datasets: [
+                {
+                  label: "Bettina 01.11.",
+                  data: align(s1),
+                  borderColor: "#22c55e",
+                  tension: 0.25,
+                  spanGaps: true,
+                  pointRadius: 4,
+                  fill: false
+                },
+                {
+                  label: "Amelie + David 02.11.",
+                  data: align(s2),
+                  borderColor: "#38bdf8",
+                  tension: 0.25,
+                  spanGaps: true,
+                  pointRadius: 4,
+                  fill: false
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { labels: { color: "#94a3b8", boxWidth: 12 } }
+              },
+              scales: {
+                y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+                x: { ticks: { color: "#94a3b8", maxRotation: 45, font: { size: 10 } }, grid: { display: false } }
+              }
+            }
+          });
+        }
+
+        if (window.Chart) {
+          drawLine();
+        } else {
+          let tries = 0;
+          const t = setInterval(() => {
+            tries++;
+            if (window.Chart || tries > 25) {
+              clearInterval(t);
+              drawLine();
+            }
+          }, 150);
+        }
 
       } catch (err) {
         document.getElementById("status").textContent = "Fehler: " + err.message;
