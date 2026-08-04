@@ -88,18 +88,16 @@
       const entries = [];
 
       for (const line of lines) {
-        // Suche nach Label + Preis am Ende der relevanten Felder
-        // Beispiel: ...1P | Rück 2026-10-31 | economy,1,2026-10-31,economy,1530,...
-        const m = line.match(/(1P|2P)\s*\|\s*Rück\s*(2026-\d{2}-\d{2})\s*\|\s*(economy|premium-economy|business).*?,(\d{3,5}),/);
+        // Sehr präzise: 1P | Rück 2026-10-31 | economy,1,2026-10-31,economy,1530,
+        const m = line.match(/(1P|2P)\s*\|\s*Rück\s+(2026-\d{2}-\d{2})\s*\|\s*(economy|premium-economy|business),(\d+),2026-\d{2}-\d{2},\3,(\d{3,5})/);
         if (m) {
-          // Timestamp am Anfang der Zeile
           const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
           entries.push({
             ts: tsMatch ? tsMatch[1] : "",
             persons: m[1] === "1P" ? 1 : 2,
             returnDate: m[2],
             cabin: m[3],
-            price: parseInt(m[4], 10)
+            price: parseInt(m[5], 10)
           });
         }
       }
@@ -128,13 +126,10 @@
         const text = await res.text();
         const entries = parseCSV(text);
 
-        if (entries.length === 0) {
-          document.getElementById("status").textContent = "Keine gültigen Preise gefunden.";
-          return;
-        }
-
-        const lastTs = entries.map(e => e.ts).filter(Boolean).sort().pop() || "unbekannt";
-        document.getElementById("status").textContent = "Letzter Stand: " + lastTs + " UTC · " + entries.length + " Einträge";
+        document.getElementById("status").textContent = 
+          entries.length === 0 
+            ? "Keine gültigen Preise gefunden." 
+            : "Letzter Stand: " + (entries.map(e => e.ts).filter(Boolean).sort().pop() || "?") + " UTC · " + entries.length + " Einträge";
 
         const combos = [
           { persons:1, ret:"2026-10-31", label:"Bettina", short:"31.10." },
@@ -144,8 +139,7 @@
         ];
 
         // Economy
-        const ecoPrices = [];
-        const ecoLabels = [];
+        const ecoPrices = [], ecoLabels = [];
         let ecoHtml = "";
 
         combos.forEach(c => {
@@ -163,7 +157,7 @@
         });
         document.getElementById("ecoTable").innerHTML = ecoHtml;
 
-        if (typeof Chart !== "undefined") {
+        if (window.Chart) {
           new Chart(document.getElementById("chartEco"), {
             type: "bar",
             data: {
@@ -198,7 +192,7 @@
         });
         document.getElementById("premTable").innerHTML = premHtml;
 
-        if (typeof Chart !== "undefined") {
+        if (window.Chart) {
           new Chart(document.getElementById("chartPrem"), {
             type: "bar",
             data: {
@@ -220,17 +214,11 @@
         }
 
       } catch (err) {
-        document.getElementById("status").textContent = "Fehler beim Laden: " + err.message;
-        console.error(err);
+        document.getElementById("status").textContent = "Fehler: " + err.message;
       }
     }
 
-    // Warte kurz, bis Chart.js geladen ist
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", load);
-    } else {
-      setTimeout(load, 100);
-    }
+    setTimeout(load, 300);
   </script>
 </body>
 </html>
